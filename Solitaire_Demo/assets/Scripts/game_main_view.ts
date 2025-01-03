@@ -1,4 +1,4 @@
-import { _decorator, Component, Node, Prefab, instantiate, input, EventTouch, Input, UITransform, v3, Vec3 } from 'cc';
+import { _decorator, Component, Node, Prefab, instantiate, input, EventTouch, Input, UITransform, v3, Vec3, tween } from 'cc';
 import { Card } from './Card';
 import { data_manager } from './data_manager';
 const { ccclass, property } = _decorator;
@@ -28,6 +28,8 @@ export class game_main_view extends Component {
 
     onLoad():void {
         this.init_ui()
+        this.init_touch()
+
     }
 
     init_ui() {
@@ -48,15 +50,13 @@ export class game_main_view extends Component {
     init_pos() {
         for (let index = 1; index <= 7; index++) {
             let col = this.u_layout_tableau.getChildByName("node_col_" + index)!
-            this.m_play_pos[index] = col.getPosition()
+            let pos = this.u_layout_tableau.getComponent(UITransform)!.convertToWorldSpaceAR(col.getPosition())
+            this.m_play_pos[index] = pos
         }
         for (let index = 1; index < 4; index++) {
             let node = this.layout_top.getChildByName("node_order_" + index)!
-            this.m_order_pos[index] = node.getPosition()
-        }
-        for (let index = 1; index < 4; index++) {
-            let node = this.layout_top.getChildByName("node_order_" + index)!
-            this.m_order_pos[index] = node.getPosition()
+            let pos = this.layout_top.getComponent(UITransform)!.convertToWorldSpaceAR(node.getPosition())
+            this.m_order_pos[index] = pos
         }
         let node_deck = this.layout_top.getChildByName("node_deck_3")!
         this.m_deal_card_pos = node_deck.getPosition()
@@ -65,16 +65,20 @@ export class game_main_view extends Component {
     start(){
         this.m_data_manager = new data_manager();
         this.init_game()
+        this.deal_cards()
+    }
 
+    get_self_pos(pos: Vec3) {
+        let transform = this.node!.getComponent(UITransform)!;
+        return transform.convertToNodeSpaceAR(v3(pos.x, pos.y, 0))!;
+    }
+
+    //------------------------- 触摸事件 begin------------------------------------
+    init_touch() {
         input.on(Input.EventType.TOUCH_START, this.on_touch_begin, this);
         input.on(Input.EventType.TOUCH_MOVE, this.on_touch_move, this);
         input.on(Input.EventType.TOUCH_END, this.on_touch_end, this);
         input.on(Input.EventType.TOUCH_CANCEL, this.on_touch_end, this);
-    }
-
-    get_self_pos(pos: Vec3) {
-        let transform = this.node?.getComponent(UITransform);
-        return transform?.convertToNodeSpaceAR(v3(pos.x, pos.y, 0))!;
     }
 
     on_touch_begin(event: EventTouch) {
@@ -104,7 +108,7 @@ export class game_main_view extends Component {
     }
 
     init_game(){
-        this.m_data_manager.reset_data();
+        this.m_data_manager.initialize_game();
         let game_data = this.m_data_manager.get_game_data();
         
         console.log(game_data);
@@ -118,8 +122,39 @@ export class game_main_view extends Component {
             this.m_all_cards.push(card)
             console.log(card_data.rank, card_data.suit);
 
-            card.position = this.get_self_pos(this.m_deal_card_pos)
+            let pos = this.layout_top.getComponent(UITransform)!.convertToWorldSpaceAR(this.m_deal_card_pos)
+            card.position = this.get_self_pos(pos)
         })
+    }
+
+    deal_cards() {
+        let card_index = 0
+        for (let index = 1; index <= 7; index++) {
+            let groups = []
+            for (let j = 0; j < index; j++) {
+                // let card = this.m_deck_manager.get_top_card()
+                let card = this.m_all_cards[card_index]
+                groups.push(card)
+                // card.setSiblingIndex(1000)
+                card_index++
+
+                let comp = card.getComponent(Card)!
+                // comp.set_status({ status: mius.g_def.ENUM_CARD_STATUS.PLAY, col: index, row: j })
+
+                if (j == index - 1) {
+                    comp.set_is_show_card(true)
+                    // comp.m_is_fix = false
+                }
+                let pos = this.get_self_pos(this.m_play_pos[index]) 
+                tween(card)
+                    .hide()
+                    .delay(0.05 * card_index)
+                    .show()
+                    .to(0.1, { position: new Vec3(pos.x, pos.y - (groups.length - 1) * 30, 0) })
+                    .start()
+            }
+            this.m_play_groups.push(groups)
+        }
     }
 }
 
