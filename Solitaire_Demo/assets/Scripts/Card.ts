@@ -1,4 +1,5 @@
-import { _decorator, Component, Node, Label } from 'cc';
+import { _decorator, Component, Node, Label, Rect } from 'cc';
+import { g_manager } from './core/g_manager';
 const { ccclass, property } = _decorator;
 
 const suits = ['♠', '♥', '♣', '♦'];
@@ -6,10 +7,17 @@ const suits = ['♠', '♥', '♣', '♦'];
 @ccclass('Card')
 export class Card extends Component {
 
-    private _rank:number
-    private _suit:number
+    _rank:number
+    _suit:number
+
+    m_is_fix:boolean;
+    m_is_select:boolean;
+    m_status: number = g_manager.g_def.ENUM_CARD_STATUS.NONE
 
     is_show:boolean = false;
+
+    m_col:number;
+    m_row:number;
 
     @property(Node)
     lab_num:Node;
@@ -36,6 +44,12 @@ export class Card extends Component {
         this.update_card_show()
     }
 
+    get_rect() {
+        const pos = this.node.position
+        const size = g_manager.g_func.get_show_size(this.node)
+        return new Rect(pos.x - size.x / 2, pos.y - size.y / 2, size.x, size.y)
+    }
+
     update_card_show(){
         this.lab_num.active = this.is_show;
         this.lab_color.active = this.is_show;
@@ -48,6 +62,12 @@ export class Card extends Component {
     set_is_show_card(is_show:boolean){
         this.is_show = is_show
         this.update_card_show()
+    }
+
+    set_status(info: { status: number, col: number | null, row: number | null }) {
+        this.m_status = info.status
+        this.m_col = info.col
+        this.m_row = info.row
     }
 
 }

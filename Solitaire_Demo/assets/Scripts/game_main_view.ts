@@ -1,6 +1,7 @@
 import { _decorator, Component, Node, Prefab, instantiate, input, EventTouch, Input, UITransform, v3, Vec3, tween } from 'cc';
 import { Card } from './Card';
 import { data_manager } from './data_manager';
+import { g_manager } from './core/g_manager';
 const { ccclass, property } = _decorator;
 
 @ccclass('game_main_view')
@@ -20,6 +21,7 @@ export class game_main_view extends Component {
 
     m_deal_card_pos:Vec3;
 
+    selected_card: Node | null = null
     u_layout_tableau: Node = null!;
     layout_top: Node = null!
     // u_layout_btn: Node = null!
@@ -80,6 +82,54 @@ export class game_main_view extends Component {
         input.on(Input.EventType.TOUCH_END, this.on_touch_end, this);
         input.on(Input.EventType.TOUCH_CANCEL, this.on_touch_end, this);
     }
+    
+
+    check_is_select_play_card(pos: Vec3) {
+        for (let col = 0; col < this.m_play_groups.length; col++) {
+            const groups = this.m_play_groups[col];
+            for (let index = groups.length - 1; index > 0; index--) {
+                const card = groups[index];
+                let comp = card.getComponent(Card)
+                let rect = comp?.get_rect()
+                if (!comp.m_is_fix && !comp.m_is_select && g_manager.g_func.rect_contains_point(rect!, pos)) {
+                    return card
+                }
+            }
+        }
+        return false
+    }
+
+    get_select_card(pos: Vec3) {
+        let res = this.check_is_select_play_card(pos)
+        if (res) {
+            return res
+        }
+        res = this.check_is_select_play_card(pos)
+        if (res) {
+            return res
+        }
+        // res = this.check_is_select_sort_card(pos)
+        // if (res) {
+        //     return res
+        // }
+    }
+
+    update_select_card_pos(pos: Vec3) {
+        let comp = this.selected_card.getComponent(Card)!
+        if (comp.m_status == g_manager.g_def.ENUM_CARD_STATUS.DECK) {
+            this.selected_card.position = pos
+            this.selected_card.setSiblingIndex(2000)
+        } else if (comp.m_status == g_manager.g_def.ENUM_CARD_STATUS.PLAY) {
+            let groups = this.m_play_groups[comp.m_col - 1]
+            for (let index = comp.m_row; index < groups.length; index++) {
+                const card = groups[index];
+                card.setPositionX(pos.x)
+                card.setPositionY(pos.y - (index - comp.m_row) * 30)
+            }
+
+        } else if (comp.m_status == g_manager.g_def.ENUM_CARD_STATUS.ORDER) {
+        }
+    }
 
     on_touch_begin(event: EventTouch) {
         let pos = event.getUILocation();
@@ -90,21 +140,66 @@ export class game_main_view extends Component {
         let transform = this.node?.getComponent(UITransform);
         let begin_pos = transform?.convertToNodeSpaceAR(v3(pos.x, pos.y, 0))!;
 
-        // let res = this.get_select_card(begin_pos)
-        // if (!res) {
-        //     return
-        // }
-        // this.selected_card = res
-        // let comp = this.selected_card.getComponent(joker_hand_card)!
-        // comp.m_is_select = true
-        // this.update_select_card_pos(begin_pos)
+        let res:Node = this.get_select_card(begin_pos)
+        if (!res) {
+            return
+        }
+        this.selected_card = res
+        let comp = res.getComponent(Card)
+        comp.m_is_select = true
+        this.update_select_card_pos(begin_pos)
     }
 
     on_touch_move(event: EventTouch) {
+        if (!this.selected_card) {
+            return false
+        }
+        let pos = event.getUILocation();
+        let transform = this.node?.getComponent(UITransform);
+        let move_pos = transform?.convertToNodeSpaceAR(v3(pos.x, pos.y, 0))!;
+        this.update_select_card_pos(move_pos)
+        // if (this.selected_card) {
+        //     this.selected_card.position = move_pos
+        // }
 
     }
     
     on_touch_end(event: EventTouch) {
+        if (this.selected_card) {
+            let pos = event.getUILocation();
+            let transform = this.node!.getComponent(UITransform)!
+            let move_pos = transform.convertToNodeSpaceAR(v3(pos.x, pos.y, 0))!;
+            let card = this.get_select_card(move_pos)
+            if (card) {
+                let comp = card.getComponent(Card)!
+                // mius.log.trace(comp.num + " cardaaaaaa")
+                if (comp.m_status == g_manager.g_def.ENUM_CARD_STATUS.PLAY) {
+                    let groups = this.m_play_groups[comp.m_col - 1]
+                    // if (this.check_can_move(groups)) {
+                    //     this.move_card(groups)
+                    // }
+                    // for (let index = comp.m_row; index < groups.length; index++) {
+                    //     const card = groups[index];
+                    //     card.setPositionX(pos.x)
+                    //     card.setPositionY(pos.y - (index - comp.m_row) * 30)
+                    // }
+
+                } else if (comp.m_status == g_manager.g_def.ENUM_CARD_STATUS.ORDER) {
+                }
+                this.update_play_card_pos()
+            }
+        }
+        this.selected_card = null
+    }
+    update_play_card_pos() {
+        for (let index = 0; index < this.m_play_groups.length; index++) {
+            const groups = this.m_play_groups[index];
+            for (let j = 0; j < groups.length; j++) {
+                const card = groups[j];/*  */
+                card.setPositionX(this.m_play_pos[index + 1].x)
+                card.setPositionY(this.m_play_pos[index + 1].y - (j) * 30)
+            }
+        }
     }
 
     init_game(){
@@ -139,7 +234,7 @@ export class game_main_view extends Component {
                 card_index++
 
                 let comp = card.getComponent(Card)!
-                // comp.set_status({ status: mius.g_def.ENUM_CARD_STATUS.PLAY, col: index, row: j })
+                comp.set_status({ status: g_manager.g_def.ENUM_CARD_STATUS.PLAY, col: index, row: j })
 
                 if (j == index - 1) {
                     comp.set_is_show_card(true)
