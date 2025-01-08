@@ -1,17 +1,18 @@
-import { _decorator, Component, Node, Label, Rect } from 'cc';
+import { _decorator, Component, Node, Label, Rect, Color } from 'cc';
 import { g_manager } from './core/g_manager';
 const { ccclass, property } = _decorator;
 
-const suits = ['♠', '♥', '♣', '♦'];
+const nums = ['A','2','3','4','5','6','7','8','9','T','J','Q','K'];
+const colors = ['♠', '♥', '♣', '♦'];
 
 @ccclass('Card')
 export class Card extends Component {
 
-    _rank:number
-    _suit:number
+    m_num:number
+    m_color:number
 
     m_is_fix:boolean;
-    m_is_select:boolean;
+    m_is_select:boolean = false;
     m_status: number = g_manager.g_def.ENUM_CARD_STATUS.NONE
 
     is_show:boolean = false;
@@ -25,22 +26,12 @@ export class Card extends Component {
     @property(Node)
     lab_color:Node;
 
-    set rank(value:number){
-        this._rank = value;
-    }
-    get rank(){
-        return this._rank;
-    }
-    set suit(value:number){
-        this._suit = value;
-    }
-    get suit(){
-        return this._suit;
-    }
+    @property(Node)
+    lab_top_color:Node;
 
-    init(rank: number, suit: number){
-        this.rank = rank;
-        this.suit = suit;
+    init(num: number, color: number){
+        this.m_num = num;
+        this.m_color = color;
         this.update_card_show()
     }
 
@@ -53,9 +44,18 @@ export class Card extends Component {
     update_card_show(){
         this.lab_num.active = this.is_show;
         this.lab_color.active = this.is_show;
+        this.lab_top_color.active = this.is_show;
         if (this.is_show) {
-            this.lab_num.getComponent(Label)!.string = "" + this.rank
-            this.lab_color.getComponent(Label)!.string = "" + suits[this.suit - 1]
+            this.lab_num.getComponent(Label)!.string = "" + nums[this.m_num - 1]
+            this.lab_color.getComponent(Label)!.string = "" + colors[this.m_color - 1]
+            this.lab_top_color.getComponent(Label)!.string = "" + colors[this.m_color - 1]
+            if (this.m_color == 1 || this.m_color == 3){
+                this.lab_color.getComponent(Label)!.color = new Color(255, 255, 255, 255)
+                this.lab_top_color.getComponent(Label)!.color = new Color(255, 255, 255, 255)
+            }else{
+                this.lab_color.getComponent(Label)!.color = new Color(255, 0, 0, 255)
+                this.lab_top_color.getComponent(Label)!.color = new Color(255, 0, 0, 255)
+            }
         }
     }
 
@@ -64,10 +64,10 @@ export class Card extends Component {
         this.update_card_show()
     }
 
-    set_status(info: { status: number, col: number | null, row: number | null }) {
-        this.m_status = info.status
-        this.m_col = info.col
-        this.m_row = info.row
+    set_status(status: number, col?: number, row?: number ) {
+        this.m_status = status
+        this.m_col = col
+        this.m_row = row
     }
 
 }

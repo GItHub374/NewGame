@@ -2,19 +2,15 @@
 const suits = ['1', '2', '3', '4'];
 const ranks = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13'];
 
-type Card = {
+type Type_Card = {
     rank: string;
     suit: string;
 };
 
 export class data_manager {
-    deck: Card[] = [];
-    remainingDeck: Card[] = [];
-    columns: Card[][] = Array(7).fill([]).map(() => []);
-
-    // start() {
-    //     this.initializeGame()
-    // }
+    deck: Type_Card[] = [];
+    remainingDeck: Type_Card[] = [];
+    columns: Type_Card[][] = Array(7).fill([]).map(() => []);
 
     get_game_data(){
         return { deck: this.deck, remainingDeck: this.remainingDeck, columns: this.columns }
