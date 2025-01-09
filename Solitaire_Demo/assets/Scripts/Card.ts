@@ -11,7 +11,7 @@ export class Card extends Component {
     m_num:number
     m_color:number
 
-    m_is_fix:boolean;
+    m_is_fix:boolean = false;
     m_is_select:boolean = false;
     m_status: number = g_manager.g_def.ENUM_CARD_STATUS.NONE
 
@@ -19,6 +19,8 @@ export class Card extends Component {
 
     m_col:number;
     m_row:number;
+
+    m_order_index:number;
 
     @property(Node)
     lab_num:Node;
@@ -64,10 +66,11 @@ export class Card extends Component {
         this.update_card_show()
     }
 
-    set_status(status: number, col?: number, row?: number ) {
+    set_status(status: number, col?: number, row?: number, order_index?: number ) {
         this.m_status = status
         this.m_col = col
         this.m_row = row
+        this.m_order_index = order_index
     }
 
 }

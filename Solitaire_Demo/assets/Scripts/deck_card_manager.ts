@@ -2,7 +2,7 @@
  * 管理发牌区
  * 功能：
  */
-import { _decorator, Node, Vec3 } from 'cc';
+import { _decorator, Node, Vec3, v3 } from 'cc';
 import { Card } from './Card';
 import { g_manager } from './core/g_manager';
 
@@ -37,6 +37,8 @@ export class deck_card_manager {
 
     remove_one_card() {
         let card = this.m_open_cards.pop()
+        let comp = card.getComponent(Card)
+        comp.m_is_fix = false
         this.update_open_card_pos()
         return card
     }
@@ -46,11 +48,11 @@ export class deck_card_manager {
             let card = this.m_open_cards.pop()
             let comp = card.getComponent(Card)
             comp.set_is_show_card(false)
-            if (index == this.m_open_cards.length) {
-                comp.m_is_fix = false
-            } else {
-                comp.m_is_fix = true
-            }
+            // if (index == this.m_open_cards.length) {
+            //     comp.m_is_fix = false
+            // } else {
+            //     comp.m_is_fix = true
+            // }
             card.position = this.m_init_pos
             card.setSiblingIndex(1000)
             this.m_deck_cards.push(card)
@@ -74,7 +76,8 @@ export class deck_card_manager {
         let pos_index = 0
         for (let index = this.m_open_cards.length; index > 0; index--) {
             let card = this.m_open_cards[index - 1]
-            card.setPositionX(this.m_init_pos.x - 85 - 42.5 * pos_index)
+            card.position = v3(this.m_init_pos.x - 85 - 42.5 * pos_index, this.m_init_pos.y)
+            // card.setPositionX(this.m_init_pos.x - 85 - 42.5 * pos_index)
             let comp = card.getComponent(Card)
             comp.set_is_show_card(true)
             pos_index = pos_index == 2 ? pos_index : pos_index + 1
