@@ -6,7 +6,7 @@ import { deck_card_manager } from './deck_card_manager';
 import { foundation_controller } from './foundation_controller';
 const { ccclass, property } = _decorator;
 
-const CARD_OFFSET = 30
+const CARD_OFFSET = 30 //两张牌之间的间距
 
 @ccclass('game_main_view')
 export class game_main_view extends Component {
@@ -14,34 +14,32 @@ export class game_main_view extends Component {
     @property(Prefab)
     card_prefab: Prefab = null;  // 牌预制体
 
-    m_data_manager = new data_manager();
-    m_deck_manager = new deck_card_manager();
-    m_foundation_groups = new foundation_controller();
+    m_data_manager = new data_manager();    // 游戏数据
+    m_deck_manager = new deck_card_manager();   // 发牌区
+    m_foundation_manager = new foundation_controller(); // 回收区
 
     m_play_groups: Node[][] = [];
     m_play_pos: Vec3[] = [];
     m_deal_card_pos: Vec3;
 
-    // tb_order:Node[][] = []; // 排序层级
-
-    selected_card: Node | null = null
+    selected_card: Node = null;
     u_layout_tableau: Node = null!;
-    layout_top: Node = null!
+    u_layout_top: Node = null!
 
     onLoad(): void {
         this.init_ui()
         this.init_touch()
     }
 
-    init_ui() {
-        this.u_layout_tableau = this.node.getChildByName("layout_tableau")!
-        this.layout_top = this.node.getChildByName("layout_top")!
-        this.init_pos()
-    }
-
     start() {
         this.init_game()
         this.deal_cards()
+    }
+
+    init_ui() {
+        this.u_layout_tableau = this.node.getChildByName("layout_tableau")!
+        this.u_layout_top = this.node.getChildByName("layout_top")!
+        this.init_pos()
     }
 
     init_pos() {
@@ -51,14 +49,14 @@ export class game_main_view extends Component {
             this.m_play_pos[index] = pos
         }
         for (let index = 1; index <= 4; index++) {
-            let node = this.layout_top.getChildByName("node_order_" + index)!
-            let pos = this.layout_top.getComponent(UITransform)!.convertToWorldSpaceAR(node.getPosition())
-            this.m_foundation_groups.set_init_pos(index, this.get_self_pos(pos))
+            let node = this.u_layout_top.getChildByName("node_order_" + index)!
+            let pos = this.u_layout_top.getComponent(UITransform)!.convertToWorldSpaceAR(node.getPosition())
+            this.m_foundation_manager.set_init_pos(index, this.get_self_pos(pos))
         }
-        let node_deck = this.layout_top.getChildByName("node_deck_3")!
+        let node_deck = this.u_layout_top.getChildByName("node_deck_3")!
         this.m_deal_card_pos = node_deck.getPosition()
 
-        let pos = this.layout_top.getComponent(UITransform)!.convertToWorldSpaceAR(node_deck.getPosition())
+        let pos = this.u_layout_top.getComponent(UITransform)!.convertToWorldSpaceAR(node_deck.getPosition())
         this.m_deck_manager.set_pos(this.get_self_pos(pos))
     }
 
@@ -67,6 +65,95 @@ export class game_main_view extends Component {
         input.on(Input.EventType.TOUCH_MOVE, this.on_touch_move, this);
         input.on(Input.EventType.TOUCH_END, this.on_touch_end, this);
         input.on(Input.EventType.TOUCH_CANCEL, this.on_touch_end, this);
+    }
+
+    init_game() {
+        this.m_data_manager.initialize_game();
+        let game_data = this.m_data_manager.get_game_data();
+
+        console.log(game_data);
+
+        game_data.remainingDeck.forEach((card_data) => {
+            let card = instantiate(this.card_prefab)
+            let comp = card.getComponent(Card)
+            comp.init(Number(card_data.rank), Number(card_data.suit))
+            comp.set_status(g_manager.g_def.ENUM_CARD_STATUS.DECK)
+            comp.set_is_show_card(false)
+            card.parent = this.node
+
+            this.m_deck_manager.insert_one_card(card)
+
+            let pos = this.u_layout_top.getComponent(UITransform)!.convertToWorldSpaceAR(this.m_deal_card_pos)
+            card.position = this.get_self_pos(pos)
+        })
+
+        game_data.columns.forEach((col_data) => {
+            col_data.forEach((card_data) => {
+                let card = instantiate(this.card_prefab)
+                let comp = card.getComponent(Card)
+                comp.init(Number(card_data.rank), Number(card_data.suit))
+                comp.set_status(g_manager.g_def.ENUM_CARD_STATUS.DECK)
+                comp.set_is_show_card(false)
+                card.parent = this.node
+                this.m_deck_manager.insert_one_card(card)
+
+                let pos = this.u_layout_top.getComponent(UITransform)!.convertToWorldSpaceAR(this.m_deal_card_pos)
+                card.position = this.get_self_pos(pos)
+            })
+        })
+    }
+
+    /**
+     * 点击牌堆
+     */
+    on_click_deck() {
+        console.log("deck clicked")
+        this.m_deck_manager.show_one_card()
+    }
+
+    deal_card_end() {
+
+    }
+
+    /**
+     * 发牌
+     */
+    deal_cards() {
+        let card_index = 0
+        for (let index = 1; index <= 7; index++) {
+            let groups = []
+            for (let j = 1; j <= index; j++) {
+                let card = this.m_deck_manager.get_top_card()
+                groups.push(card)
+                card.setSiblingIndex(1000)
+
+                let comp = card.getComponent(Card)!
+                comp.set_status(g_manager.g_def.ENUM_CARD_STATUS.PLAY, index, j)
+
+                if (j == index) {
+                    comp.set_is_show_card(true)
+                    comp.m_is_fix = false
+                    // console.log(comp.m_num, comp.m_color);
+                } else {
+                    comp.set_is_show_card(false)
+                    comp.m_is_fix = true
+                }
+                let pos = this.get_self_pos(this.m_play_pos[index])
+                tween(card)
+                    .hide()
+                    .delay(0.05 * card_index)
+                    .show()
+                    .to(0.1, { position: new Vec3(pos.x, pos.y - (groups.length - 1) * CARD_OFFSET, 0) })
+                    .call(() => {
+                        if (index == 7 && j == index) {
+                            this.deal_card_end()
+                        }
+                    })
+                    .start()
+                card_index++
+            }
+            this.m_play_groups.push(groups)
+        }
     }
 
     //------------------------- 触摸事件 begin------------------------------------
@@ -99,6 +186,7 @@ export class game_main_view extends Component {
     }
 
     deal_touch_move(move_pos: Vec3) {
+        // TODO:添加移动时高亮
         this.update_select_card_pos(move_pos)
     }
 
@@ -106,7 +194,6 @@ export class game_main_view extends Component {
         if (this.selected_card) {
             let pos = event.getUILocation();
             let move_pos = this.get_self_pos(v3(pos.x, pos.y, 0))
-            console.log("zjjj debug on_touch_end 1111")
             this.deal_touch_end(move_pos)
         }
         this.selected_card = null
@@ -114,9 +201,7 @@ export class game_main_view extends Component {
 
     deal_touch_end(pos: Vec3) {
         let res = this.deal_foundation_area(pos)
-        console.log("zjjj debug deal_touch_end 1111")
         if (!res) {
-            console.log("zjjj debug deal_touch_end 222")
             res = this.deal_play_area(pos)
         }
         this.update_select_status(false)
@@ -125,6 +210,7 @@ export class game_main_view extends Component {
         comp.m_is_select = false
         this.update_play_card_pos()
         this.m_deck_manager.update_open_card_pos()
+        this.m_foundation_manager.update_top_card_pos()
     }
     //------------------------- 触摸事件 end ------------------------------------
 
@@ -137,11 +223,8 @@ export class game_main_view extends Component {
             return
         }
         let group = this.m_play_groups[comp.m_col - 1]
-        console.log("zjjj debug update_select_status --- 111 ", group.length, comp.m_row, comp.m_col)
-        console.log(group)
         if (group.length > comp.m_row) {
             for (let index = comp.m_row; index <= group.length; index++) {
-                console.log("zjjj debug update_select_status --- 222 ", index, is_select)
                 const card = group[index - 1];
                 let card_comp = card.getComponent(Card)
                 card_comp.m_is_select = is_select
@@ -162,11 +245,6 @@ export class game_main_view extends Component {
             let groups = this.m_play_groups[index - 1];
             let height = size.y + groups.length * CARD_OFFSET
             let rect = new Rect(col_pos.x - size.x / 2, col_pos.y - height + size.x / 2, size.x, height)
-            // console.log("zjjj debug check_is_select_play_card 111")
-            // console.log(index)
-            // console.log(rect)
-            // console.log(pos)
-            // console.log("zjjj debug check_is_select_play_card 2222", g_manager.g_func.rect_contains_point(rect, pos))
             if (g_manager.g_func.rect_contains_point(rect, pos)) {
                 return index
             }
@@ -176,8 +254,8 @@ export class game_main_view extends Component {
 
     get_foundation_index(pos: Vec3) {
         for (let index = 1; index <= 4; index++) {
-            let node = this.layout_top.getChildByName("node_order_" + index)!
-            let node_pos = this.layout_top.getComponent(UITransform)!.convertToWorldSpaceAR(node.position)
+            let node = this.u_layout_top.getChildByName("node_order_" + index)!
+            let node_pos = this.u_layout_top.getComponent(UITransform)!.convertToWorldSpaceAR(node.position)
             node_pos = this.get_self_pos(node_pos)
             const size = g_manager.g_func.get_show_size(node)
             let rect = new Rect(node_pos.x - size.x / 2, node_pos.y - size.y / 2, size.x, size.y)
@@ -192,26 +270,23 @@ export class game_main_view extends Component {
     check_is_select_foundation(pos: Vec3) {
         let index = this.get_foundation_index(pos)
         if (index > 0) {
-            return this.m_foundation_groups.get_top_card(index)
+            return this.m_foundation_manager.get_top_card(index)
         }
         return null
     }
 
     get_select_card(pos: Vec3) {
         // 是否选中发牌区
-        console.log("zjjj debgu get_select_card 111");
         let res = this.m_deck_manager.get_is_sclect_deck_card(pos)
         if (res) {
             return res
         }
-        console.log("zjjj debgu get_select_card 222");
 
         // 是否选中了回收区的牌
         let res2 = this.check_is_select_foundation(pos)
         if (res2) {
             return res2
         }
-        console.log("zjjj debgu get_select_card 333");
 
         for (let index = 0; index < this.m_play_groups.length; index++) {
             let groups = this.m_play_groups[index];
@@ -226,7 +301,6 @@ export class game_main_view extends Component {
             }
         }
 
-        console.log("zjjj debgu get_select_card 444");
         return null
     }
 
@@ -269,11 +343,11 @@ export class game_main_view extends Component {
     // 是否放到了回收区
     deal_foundation_area(pos: Vec3) {
         let index = this.get_foundation_index(pos)
-        if (index > 0 && this.m_foundation_groups.check_can_insert_one_card(index, this.selected_card)) {
+        if (index > 0 && this.m_foundation_manager.check_can_insert_one_card(index, this.selected_card)) {
             let card_comp = this.selected_card.getComponent(Card)!
             if (card_comp.m_status == g_manager.g_def.ENUM_CARD_STATUS.DECK) {
                 this.m_deck_manager.remove_one_card()
-                this.m_foundation_groups.insert_one_card(index, this.selected_card)
+                this.m_foundation_manager.insert_one_card(index, this.selected_card)
                 card_comp.set_status(g_manager.g_def.ENUM_CARD_STATUS.ORDER, 0, 0, index)
                 return true
 
@@ -287,7 +361,7 @@ export class game_main_view extends Component {
                     last_card_comp.set_is_show_card(true)
                     last_card_comp.m_is_fix = false
                 }
-                this.m_foundation_groups.insert_one_card(index, this.selected_card)
+                this.m_foundation_manager.insert_one_card(index, this.selected_card)
                 card_comp.set_status(g_manager.g_def.ENUM_CARD_STATUS.ORDER, 0, 0, index)
                 return true
             }
@@ -351,96 +425,5 @@ export class game_main_view extends Component {
     get_self_pos(pos: Vec3) {
         let transform = this.node!.getComponent(UITransform)!;
         return transform.convertToNodeSpaceAR(v3(pos.x, pos.y, 0))!;
-    }
-
-    init_game() {
-        this.m_data_manager.initialize_game();
-        let game_data = this.m_data_manager.get_game_data();
-
-        console.log(game_data);
-
-        game_data.remainingDeck.forEach((card_data) => {
-            let card = instantiate(this.card_prefab)
-            let comp = card.getComponent(Card)
-            comp.init(Number(card_data.rank), Number(card_data.suit))
-            comp.set_status(g_manager.g_def.ENUM_CARD_STATUS.DECK)
-            comp.set_is_show_card(false)
-            card.parent = this.node
-            // console.log(card_data.rank, card_data.suit);
-
-            this.m_deck_manager.insert_one_card(card)
-
-            let pos = this.layout_top.getComponent(UITransform)!.convertToWorldSpaceAR(this.m_deal_card_pos)
-            card.position = this.get_self_pos(pos)
-        })
-
-        game_data.columns.forEach((col_data) => {
-            col_data.forEach((card_data) => {
-                let card = instantiate(this.card_prefab)
-                let comp = card.getComponent(Card)
-                comp.init(Number(card_data.rank), Number(card_data.suit))
-                comp.set_status(g_manager.g_def.ENUM_CARD_STATUS.DECK)
-                comp.set_is_show_card(false)
-                card.parent = this.node
-                // console.log(card_data.rank, card_data.suit);
-                this.m_deck_manager.insert_one_card(card)
-
-                let pos = this.layout_top.getComponent(UITransform)!.convertToWorldSpaceAR(this.m_deal_card_pos)
-                card.position = this.get_self_pos(pos)
-            })
-        })
-    }
-
-    /**
-     * 点击牌堆
-     */
-    on_click_deck() {
-        console.log("deck clicked")
-        this.m_deck_manager.show_one_card()
-    }
-
-    deal_card_end() {
-
-    }
-
-    /**
-     * 发牌
-     */
-    deal_cards() {
-        let card_index = 0
-        for (let index = 1; index <= 7; index++) {
-            let groups = []
-            for (let j = 1; j <= index; j++) {
-                let card = this.m_deck_manager.get_top_card()
-                groups.push(card)
-                card.setSiblingIndex(1000)
-
-                let comp = card.getComponent(Card)!
-                comp.set_status(g_manager.g_def.ENUM_CARD_STATUS.PLAY, index, j)
-
-                if (j == index) {
-                    comp.set_is_show_card(true)
-                    comp.m_is_fix = false
-                    // console.log(comp.m_num, comp.m_color);
-                } else {
-                    comp.set_is_show_card(false)
-                    comp.m_is_fix = true
-                }
-                let pos = this.get_self_pos(this.m_play_pos[index])
-                tween(card)
-                    .hide()
-                    .delay(0.05 * card_index)
-                    .show()
-                    .to(0.1, { position: new Vec3(pos.x, pos.y - (groups.length - 1) * CARD_OFFSET, 0) })
-                    .call(() => {
-                        if (index == 7 && j == index) {
-                            this.deal_card_end()
-                        }
-                    })
-                    .start()
-                card_index++
-            }
-            this.m_play_groups.push(groups)
-        }
     }
 }
